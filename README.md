@@ -16,6 +16,22 @@ The state lives in the filesystem. `ls $LLM_SKILLS_HOME/skills/` shows you every
 
 ## Install
 
+**Homebrew (macOS / Linux)**
+
+```bash
+brew tap choreogrifi/skill-forge
+brew install skill-forge
+```
+
+**curl one-liner**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Choreogrifi/skill-forge/main/scripts/install.sh | bash
+source ~/.bashrc  # or ~/.zshrc
+```
+
+**From source**
+
 ```bash
 git clone https://github.com/Choreogrifi/skill-forge.git
 cd skill-forge

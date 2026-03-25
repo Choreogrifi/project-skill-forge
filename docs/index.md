@@ -10,6 +10,21 @@ Skills are directories. State is encoded in the directory name. Symlinks control
 
 ## Install
 
+**Homebrew (macOS / Linux)**
+
+```bash
+brew tap choreogrifi/skill-forge
+brew install skill-forge
+```
+
+**curl one-liner**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Choreogrifi/skill-forge/main/scripts/install.sh | bash
+```
+
+**From source**
+
 ```bash
 git clone https://github.com/Choreogrifi/skill-forge.git
 cd skill-forge
