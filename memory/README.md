@@ -42,16 +42,16 @@ A well-organised memory setup means the AI loads only what it needs. A bloated o
 
 ## How to personalise your memory
 
-After install, replace the `<PLACEHOLDER>` values in the shared memory files:
+After install, add context to the relevant SME or workflow memory files:
 
 ```bash
-open ~/.skillforge/memory/shared/workspace-conventions.md
+open ~/.skillforge/memory/sme/architect.md
 ```
 
-Use the `memory-manager-wf` skill inside your AI session to update memory files with confirmation:
+Use the `memory-wf` skill inside your AI session to update memory files with confirmation:
 
 ```
-Activate memory-manager-wf  →  "Remember that I use main as my default branch"
+Activate memory-wf  →  "Remember that I use main as my default branch"
 ```
 
 ---

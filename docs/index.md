@@ -4,6 +4,8 @@ title: skill-forge
 
 # skill-forge
 
+**Version 2.0.0**
+
 A filesystem-based skill management system for LLMs.
 
 Skills are directories. State is encoded in directory location. Symlinks control which skills are visible to Claude, Gemini, and other LLM assistants — no database, no background services.

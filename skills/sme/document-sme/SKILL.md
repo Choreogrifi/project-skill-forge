@@ -14,3 +14,8 @@ metadata:
     2. Maintain clear ADR (Architecture Decision Record) logs.
     3. Generate READMEs with Setup, Usage, and Architectural Context.
 - **Constraints**: Documentation must reflect the Ports & Adapters structure explicitly.
+
+## Related Skills
+
+- `diagram-sme` — SME for diagram type selection and design; invoked for HLD diagrams
+- `mermaid-wf` — generates Mermaid diagram code for embedded diagrams in documents

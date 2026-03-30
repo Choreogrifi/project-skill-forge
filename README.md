@@ -49,7 +49,7 @@ AI:     Reads both sides of the conflict, explains the trade-off,
 ```
 User:   Add a new Cloud Run job for the order processor
 
-With terraform-sme + terraform-creator-wf active:
+With terraform-sme + terraform-wf active:
 AI:     Discovers your existing terraform folder, reads your naming
         conventions, drafts the full HCL module, and confirms before
         writing a single file.
@@ -106,22 +106,17 @@ skillforge doctor      # check your environment
 
 | Skill | What it does |
 |---|---|
-| `manage-git-wf` | Route Git/GitHub/GitLab operations with confirmation gates |
-| `manage-github-wf` | GitHub PRs, releases, issues via `gh` CLI |
-| `manage-gitlab-wf` | GitLab MRs, pipelines via `glab` CLI |
+| `git-wf` | Routes git operations to GitHub or GitLab sub-skills |
+| `github-wf` | GitHub PRs, releases, issues via `gh` CLI |
+| `gitlab-wf` | GitLab MRs, pipelines via `glab` CLI |
 | `git-commit-wf` | Draft a commit message from your staged changes |
-| `document-writer-wf` | Create, review, update, or extend any document |
-| `write-readme-wf` | Draft a production-quality README.md |
-| `review-document-wf` | Score a document and return prioritised improvements |
-| `update-document-wf` | Edit specific sections with before/after confirmation |
-| `add-document-wf` | Append content to an existing document |
-| `mermaid-drawer-wf` | Generate and validate Mermaid diagram code |
-| `terraform-creator-wf` | Scaffold Terraform HCL for a new resource or module |
-| `terraform-discoverer-wf` | Infer required infrastructure from application code |
-| `gcp-project-discoverer-wf` | Produce a structured inventory of an existing GCP project |
-| `manage-skills-wf` | Create, audit, propose, and refine skills |
-| `memory-manager-wf` | Update memory files with before/after confirmation |
-| `create-content-wf` | Create social media posts, video scripts, or written guides |
+| `document-wf` | Create, review, update, or extend any document |
+| `mermaid-wf` | Generate and validate Mermaid diagram code |
+| `terraform-wf` | Scaffold Terraform HCL and infer infrastructure from code |
+| `gcp-wf` | Produce a structured inventory of an existing GCP project |
+| `skills-wf` | Create, audit, propose, and refine skills |
+| `memory-wf` | Update memory files with before/after confirmation |
+| `content-wf` | Create social media posts, video scripts, or written guides |
 
 ---
 

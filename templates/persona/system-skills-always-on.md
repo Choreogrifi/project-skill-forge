@@ -11,7 +11,7 @@ Propose a new skill when any of these occur:
 - User references a tool or technology not covered by any active skill
 - User asks "is there a skill for X?"
 
-Before proposing: confirm no directory `${SKILLFORGE_DIR}/skills/<name>.*` already exists.
+Before proposing: run `skillforge ls` to confirm no skill with that name already exists.
 
 Proposal format:
 ```

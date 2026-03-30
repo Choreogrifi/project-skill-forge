@@ -14,3 +14,7 @@ metadata:
     2. Verify remote state configuration before any operation — never allow local state in a shared environment.
     3. Check for resource dependencies and `depends_on` correctness before finalising any module design.
 - **Constraints**: No `terraform apply` without a reviewed plan. No hardcoded credentials or secrets in `.tf` files — use a secrets manager. No `count` or `for_each` patterns that make plan output unreadable. `terraform destroy` requires explicit user confirmation with the target resource listed.
+
+## Related Skills
+
+- `gcp-sme` — SME for GCP service selection and IAM design

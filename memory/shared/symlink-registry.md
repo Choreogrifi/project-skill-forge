@@ -14,9 +14,9 @@ as a symlink destination, skip it — read from the canonical source only.
 
 | Symlink Path | Canonical Source | Notes |
 |---|---|---|
-| `~/.claude/skills/<name>` | `${SKILLFORGE_DIR}/skills/<name>.active/` | One symlink per active skill |
+| `~/.claude/skills/<name>` | `${SKILLFORGE_DIR}/skills/<type>/<name>/` | One symlink per active skill |
 | `~/.claude/CLAUDE.md` | `${SKILLFORGE_DIR}/model.md` | Auto-synced on model.md write |
-| `~/.gemini/skills/<name>` | `${SKILLFORGE_DIR}/skills/<name>.active/` | If Gemini is a configured LLM target |
+| `~/.gemini/skills/<name>` | `${SKILLFORGE_DIR}/skills/<type>/<name>/` | If Gemini is a configured LLM target |
 | `~/.gemini/GEMINI.md` | `${SKILLFORGE_DIR}/model.md` | If Gemini is a configured LLM target |
 
 > `${SKILLFORGE_DIR}` is set at install time and written to `~/.skillforge/config.yaml`.

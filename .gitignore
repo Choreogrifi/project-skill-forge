@@ -4,6 +4,7 @@ migration.md
 discovery.md
 plan.md
 *.local.md
+model.md
 
 # User config (created at install time, contains personal paths)
 .skillforge/

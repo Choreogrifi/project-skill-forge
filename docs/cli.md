@@ -355,6 +355,59 @@ skillforge uninstall
 
 Skill data is never deleted unless you explicitly answer `yes` to the separate confirmation in step 3. This means an uninstall followed by a reinstall preserves all your skills.
 
+> **Source repository protection**: If `$SKILLFORGE_DIR` contains a `.git` directory and `scripts/install.sh`, Skill Forge assumes it is pointing at the source repository and will refuse to delete the directory. Set `SKILLFORGE_DIR` to a separate install path (e.g. `~/.skillforge`) and re-run `install.sh` to resolve.
+
+---
+
+## `skillforge update`
+
+Pull the latest skill definitions from the source repository. Updates pristine (unmodified) skills in place; stages modified skills for manual review.
+
+```bash
+skillforge update
+```
+
+**Behaviour for each changed file:**
+- **Pristine** (not customised since install) → updated in place automatically
+- **Customised** (differs from install-time checksum) → copied to `$SKILLFORGE_DIR/staging/` for review
+
+After a run with staged files:
+```bash
+skillforge staging ls                # list staged updates
+skillforge staging diff <name>       # diff staged vs installed
+skillforge staging accept <name>     # apply the staged version
+skillforge staging dismiss <name>    # discard staged version, keep customisation
+```
+
+Requires a git-based install (install.sh run from a cloned repository).
+
+---
+
+## `skillforge staging`
+
+Manage new upstream versions of skills that were staged by `skillforge update` because they had been customised.
+
+```bash
+skillforge staging ls                  # list all staged updates
+skillforge staging diff git-wf         # diff the staged vs installed version of git-wf
+skillforge staging accept git-wf       # accept the staged version (overwrites your customisation)
+skillforge staging dismiss git-wf      # discard the staged version (keep your customisation)
+```
+
+---
+
+## `skillforge customize`
+
+Interactive wizard to create environment-specific reference files and workflow skills for your installed SMEs. Safe to re-run: skips SMEs that are already customised.
+
+```bash
+skillforge customize
+```
+
+For each active SME, the wizard asks whether you want to create a matching workflow skill with environment-specific context (e.g. project IDs, naming conventions, team standards). New skills are saved to `$SKILLFORGE_DIR/skills/workflow/` and activated automatically.
+
+Run this after initial install to personalise the generic skills to your stack.
+
 ---
 
 ## `skillforge lint [file]`

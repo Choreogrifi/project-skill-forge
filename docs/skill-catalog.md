@@ -18,7 +18,7 @@ SME skills give the AI deep domain knowledge. When active, the AI applies the sk
 | `architect-sme` | Systems architecture — Hexagonal/Clean, ADRs, C4 diagrams | `sme/architect.md` | — |
 | `engineer-sme` | Software implementation — SOLID, DI, strict typing | `sme/engineer.md` | — |
 | `devops-sme` | IaC, CI/CD, Cloud Build, observability | `sme/devops.md` | `security-sme`, `terraform-sme` |
-| `security-sme` | IAM, secrets, OWASP, vulnerability assessment | `sme/security.md` | — |
+| `security-sme` | IAM, secrets, OWASP, vulnerability assessment | `sme/security.md` | `architect-sme`, `engineer-sme` |
 | `tester-sme` | Test strategy, TDD, unit/integration tests | `sme/tester.md` | — |
 | `git-sme` | Git concepts — branching, commits, conflicts, history | — | — |
 | `terraform-sme` | Terraform IaC design, modules, state management | `sme/terraform.md` | — |
@@ -43,8 +43,8 @@ Workflow skills automate multi-step processes with a confirmation gate before an
 | `mermaid-wf` | Generate, validate, and improve Mermaid diagrams | `mermaid-write-sf`, `mermaid-read-sf`, `mermaid-improve-sf` | — |
 | `terraform-wf` | Scaffold Terraform HCL for new resources or modules | `terraform-scan-sf` | `terraform-sme`, `gcp-sme` |
 | `gcp-wf` | Inventory existing GCP resources via `gcloud` | `gcp-discover-sf`, `gcp-scan-sf` | — |
-| `skills-wf` | Create, audit, propose, and refine skills | `skills-create-sf`, `skills-audit-sf`, `skills-propose-sf`, `skills-refine-sf` | `skills-sme`, `memory-wf` |
-| `memory-wf` | Update memory files with before/after confirmation | `memory-create-sf`, `memory-audit-sf` | — |
+| `skills-wf` | Create, audit, propose, and refine skills | `skills-create-sf`, `skills-detect-sf`, `skills-audit-sf`, `skills-propose-sf`, `skills-refine-sf` | `skills-sme`, `memory-wf` |
+| `memory-wf` | Update memory files with before/after confirmation | `memory-create-sf`, `memory-audit-sf`, `memory-system-toggle-sf` | — |
 | `content-wf` | Social posts, video scripts, and written guides | `content-social-sf`, `content-video-sf` | `content-creator-sme` |
 
 ---

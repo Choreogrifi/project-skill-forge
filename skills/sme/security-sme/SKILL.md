@@ -16,3 +16,12 @@ metadata:
 - **Constraints**: Critical block on any code proposing overly broad roles (e.g., owner/admin at resource root).
 - **Environment Workflows**: Security automation is environment-specific. Create `security-<env>-wf` workflow skills (e.g., `security-gcp-wf`, `security-aws-wf`) for platform-specific security operations. Use `skillforge customize` to scaffold them. Named correctly, they are auto-discovered by `skillforge audit`.
 - **References**: Environment-specific security workflows are user-created. Name them `security-<env>-wf` (e.g., `security-gcp-wf`, `security-aws-wf`) so they are auto-discovered by `skillforge audit`. Use `skillforge customize` to scaffold them.
+
+## Activation Context
+
+Invoked as a supporting advisor by `architect-sme` and `engineer-sme` when a design or implementation decision has security implications. May also be invoked directly for dedicated security reviews.
+
+## Related Skills
+
+- `architect-sme` — invokes security-sme during system design and ADR reviews
+- `engineer-sme` — invokes security-sme during code review and IAM proposal steps

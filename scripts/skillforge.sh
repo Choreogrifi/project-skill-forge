@@ -17,9 +17,9 @@
 set -euo pipefail
 
 # ---------------------------------------------------------------------------
-# Configuration — read from ~/.skillforge/config.yaml if present
+# Configuration — read from $SKILLFORGE_DIR/config.yaml if present
 # ---------------------------------------------------------------------------
-CONFIG_FILE="${HOME}/.skillforge/config.yaml"
+CONFIG_FILE="${SKILLFORGE_DIR:-${HOME}/.skillforge}/config.yaml"
 
 _read_config() {
   local key="$1" default="$2"
@@ -188,7 +188,12 @@ set_state() {
   skill_type=$(dir_to_type "$current_dir")
 
   if [[ "$current_state" == "$target_state" ]]; then
-    info "Skill '${name}' is already '${target_state}'. Nothing to do."
+    if [[ "$target_state" == "active" && "$skill_type" == "sme" ]] && ! symlinks_exist "$name"; then
+      info "Skill '${name}' is already 'active' but symlinks are missing — creating them."
+      create_symlinks "$name" "$current_dir"
+    else
+      info "Skill '${name}' is already '${target_state}'. Nothing to do."
+    fi
     return 0
   fi
 
@@ -1318,10 +1323,20 @@ cmd_uninstall() {
   # Step 4 (was 3): Optionally remove skill data
   printf '\n%sStep 4: Skill data%s — %s\n' "$BOLD" "$RESET" "$SKILLFORGE_DIR"
   printf 'Remove skill data? Deletes all skills, memory, and config. (yes / no): '
+  printf '%s(Note: removal is skipped automatically if the directory is detected as the source repository.)%s\n' "$YELLOW" "$RESET"
   local remove_data; read -r remove_data
   if [[ "$remove_data" == "yes" ]]; then
-    rm -rf "$SKILLFORGE_DIR"
-    ok "Removed: ${SKILLFORGE_DIR}"
+    # Source repository guard — refuse to delete if SKILLFORGE_DIR contains a .git dir
+    # and a scripts/install.sh file, which indicates it is the Skill Forge source repo
+    # and not a separate install target. This prevents the loss of the source directory.
+    if [[ -d "${SKILLFORGE_DIR}/.git" && -f "${SKILLFORGE_DIR}/scripts/install.sh" ]]; then
+      printf '\n%s[SAFETY]%s Refusing to delete %s — it appears to be the Skill Forge source repository (.git and scripts/install.sh detected).\n' "$RED" "$RESET" "$SKILLFORGE_DIR"
+      printf 'Set SKILLFORGE_DIR to a separate install location (e.g. %s/.skillforge) and re-run install.sh.\n' "$HOME"
+      info "Skill data NOT removed."
+    else
+      rm -rf "$SKILLFORGE_DIR"
+      ok "Removed: ${SKILLFORGE_DIR}"
+    fi
   else
     info "Kept: ${SKILLFORGE_DIR}"
   fi
@@ -1424,6 +1439,7 @@ cmd_lint() {
 # ---------------------------------------------------------------------------
 # Command: version / config
 # ---------------------------------------------------------------------------
+# VERSION SYNC: keep this version string aligned with docs/index.md "Version X.Y.Z" line
 cmd_version() { printf 'skillforge 2.0.0\n'; }
 
 cmd_config() {
@@ -1590,7 +1606,8 @@ cmd_help() {
       printf '  2. Non-active skills with stale symlinks — remove them\n'
       printf '  3. Orphan symlinks in LLM target dirs — flag for review\n'
       printf '  4. SKILL.md frontmatter completeness\n' ;;
-    *) usage ;;
+    "")  usage ;;
+    *)   printf 'Unknown command: "%s"\n\n' "$subcmd"; usage; exit 1 ;;
   esac
 }
 

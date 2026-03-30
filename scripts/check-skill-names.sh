@@ -2,12 +2,13 @@
 # check-skill-names.sh — validates skill directory naming convention
 #
 # Rules:
-#   - Skill names: lowercase letters, numbers, and hyphens only
+#   - Skill names: lowercase letters, numbers, hyphens, and underscores only
 #   - SME skills must end with -sme (e.g. git-sme, architect-sme)
-#   - Workflow/system skills must end with -wf (e.g. git-wf, memory-wf)
+#   - Workflow skills must end with -wf (e.g. git-wf, memory-wf)
+#   - System skills must end with -sys (e.g. validator-sys)
 #   - name: field in SKILL.md must equal the directory name exactly
-#   - Active skills live in skills/sme/ or skills/workflow/
-#   - Lifecycle skills live in skills/{deactivated,review,decommissioned}/{sme,workflow}/
+#   - Active skills live in skills/sme/, skills/workflow/, or skills/system/
+#   - Lifecycle skills live in skills/{deactivated,review,decommissioned}/{sme,workflow,system}/
 #
 # Usage:
 #   bash scripts/check-skill-names.sh           # check all skills
@@ -49,8 +50,8 @@ if $STAGED_ONLY; then
 else
   # Find all skill dirs: active at depth 2, lifecycle at depth 3 from SKILLS_DIR
   if [[ -d "$SKILLS_DIR" ]]; then
-    # Active skills: skills/sme/* and skills/workflow/*
-    for type_dir in "${SKILLS_DIR}/sme" "${SKILLS_DIR}/workflow"; do
+    # Active skills: skills/sme/*, skills/workflow/*, and skills/system/*
+    for type_dir in "${SKILLS_DIR}/sme" "${SKILLS_DIR}/workflow" "${SKILLS_DIR}/system"; do
       [[ -d "$type_dir" ]] || continue
       while IFS= read -r -d '' dir; do
         SKILL_DIRS+=("$(basename "$dir")")
@@ -75,17 +76,17 @@ fi
 # Validate each skill name
 # ---------------------------------------------------------------------------
 for dir_name in "${SKILL_DIRS[@]}"; do
-  # Name must contain only lowercase letters, numbers, hyphens
-  if [[ ! "$dir_name" =~ ^[a-z][a-z0-9-]+$ ]]; then
-    printf '%s[FAIL]%s  %s — name must contain only lowercase letters, numbers, and hyphens\n' \
+  # Name must contain only lowercase letters, numbers, hyphens, underscores
+  if [[ ! "$dir_name" =~ ^[a-z][a-z0-9_-]+$ ]]; then
+    printf '%s[FAIL]%s  %s — name must contain only lowercase letters, numbers, hyphens, and underscores\n' \
       "$RED" "$RESET" "$dir_name"
     VIOLATIONS=$((VIOLATIONS + 1))
     continue
   fi
 
-  # Must end with -sme or -wf
-  if [[ ! "$dir_name" =~ ^[a-z][a-z0-9-]+-(sme|wf)$ ]]; then
-    printf '%s[FAIL]%s  %s — name must end with -sme or -wf\n' "$RED" "$RESET" "$dir_name"
+  # Must end with -sme, -wf, or -sys
+  if [[ ! "$dir_name" =~ ^[a-z][a-z0-9_-]+-(sme|wf|sys)$ ]]; then
+    printf '%s[FAIL]%s  %s — name must end with -sme, -wf, or -sys\n' "$RED" "$RESET" "$dir_name"
     VIOLATIONS=$((VIOLATIONS + 1))
     continue
   fi
@@ -114,10 +115,11 @@ done
 # ---------------------------------------------------------------------------
 if [[ $VIOLATIONS -gt 0 ]]; then
   printf '\n%s%d naming violation(s) found.%s\n' "$RED" "$VIOLATIONS" "$RESET"
-  printf 'Skill names must follow the pattern: <name>-(sme|wf)\n'
-  printf '  Only lowercase letters, numbers, and hyphens allowed.\n'
-  printf '  -sme for expertise skills (e.g. git-sme, architect-sme)\n'
-  printf '  -wf  for workflow skills  (e.g. git-wf, memory-wf)\n\n'
+  printf 'Skill names must follow the pattern: <name>-(sme|wf|sys)\n'
+  printf '  Only lowercase letters, numbers, hyphens, and underscores allowed.\n'
+  printf '  -sme for expertise skills  (e.g. git-sme, architect-sme)\n'
+  printf '  -wf  for workflow skills   (e.g. git-wf, memory-wf)\n'
+  printf '  -sys for system skills     (e.g. validator-sys)\n\n'
   exit 1
 else
   $STAGED_ONLY || printf '%s[OK]%s  All skill names comply with the naming standard.\n' "$GREEN" "$RESET"
