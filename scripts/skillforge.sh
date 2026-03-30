@@ -25,7 +25,9 @@ _read_config() {
   local key="$1" default="$2"
   if [[ -f "$CONFIG_FILE" ]]; then
     local val
-    val=$(grep -E "^${key}:" "$CONFIG_FILE" 2>/dev/null | head -1 | sed "s/^${key}:[[:space:]]*//" | tr -d '"' || true)
+    # awk receives key as a variable — no regex or shell expansion of user-controlled input
+    val=$(awk -F': ' -v k="$key" '$1 == k { gsub(/"/, "", $2); print $2; exit }' \
+          "$CONFIG_FILE" 2>/dev/null || true)
     printf '%s' "${val:-$default}"
   else
     printf '%s' "$default"
@@ -61,12 +63,39 @@ require_skills_dir() {
 }
 
 # ---------------------------------------------------------------------------
+# Security helpers
+# ---------------------------------------------------------------------------
+
+# Whitelist-validate a skill name. Prevents path traversal and injection.
+# Valid names: lowercase letters, digits, hyphens; must start with a letter.
+_validate_skill_name() {
+  local name="$1"
+  [[ "$name" =~ ^[a-z][a-z0-9-]+$ ]] || \
+    die "Invalid skill name '${name}'. Names must match: ^[a-z][a-z0-9-]+$"
+}
+
+# Temp file registry — all mktemp calls go through _mktemp so files are
+# cleaned up on EXIT, INT, and TERM regardless of how the script exits.
+_TMPFILES=()
+_cleanup_tmpfiles() {
+  [[ ${#_TMPFILES[@]} -gt 0 ]] && rm -f "${_TMPFILES[@]}" 2>/dev/null || true
+}
+trap '_cleanup_tmpfiles' EXIT INT TERM
+
+_mktemp() {
+  local t; t=$(mktemp)
+  _TMPFILES+=("$t")
+  printf '%s' "$t"
+}
+
+# ---------------------------------------------------------------------------
 # Path helpers — state derived from directory location, not name
 # ---------------------------------------------------------------------------
 
 # Find the directory for a skill by name, searching all state locations
 find_skill_dir() {
   local name="$1"
+  _validate_skill_name "$name"
   local match
   # Search active locations first, then lifecycle dirs
   for search_root in \
@@ -354,6 +383,7 @@ cmd_activate() {
   [[ $# -ge 1 ]] || die "Usage: skillforge activate <name>"
   require_skills_dir
   local name="$1"
+  _validate_skill_name "$name"
   info "Activating '${name}'"
   set_state "$name" "active"
   ok "Skill '${name}' is active."
@@ -362,13 +392,14 @@ cmd_activate() {
     _regen_sme_context
   fi
 }
-cmd_review()     { [[ $# -ge 1 ]] || die "Usage: skillforge review <name>";     require_skills_dir; info "Reviewing '${1}'";   set_state "$1" "review";        ok "Skill '${1}' moved to review."; }
-cmd_deactivate() { [[ $# -ge 1 ]] || die "Usage: skillforge deactivate <name>"; require_skills_dir; info "Deactivating '${1}'"; set_state "$1" "deactivated"; ok "Skill '${1}' deactivated."; }
+cmd_review()     { [[ $# -ge 1 ]] || die "Usage: skillforge review <name>";     require_skills_dir; _validate_skill_name "$1"; info "Reviewing '${1}'";   set_state "$1" "review";        ok "Skill '${1}' moved to review."; }
+cmd_deactivate() { [[ $# -ge 1 ]] || die "Usage: skillforge deactivate <name>"; require_skills_dir; _validate_skill_name "$1"; info "Deactivating '${1}'"; set_state "$1" "deactivated"; ok "Skill '${1}' deactivated."; }
 
 cmd_rm() {
   [[ $# -ge 1 ]] || die "Usage: skillforge rm <name>"
   require_skills_dir
   local name="$1"
+  _validate_skill_name "$name"
   local current_dir; current_dir=$(find_skill_dir "$name")
   [[ "$(dir_to_state "$current_dir")" == "decommissioned" ]] && { info "Skill '${name}' is already decommissioned."; return 0; }
 
@@ -386,6 +417,7 @@ cmd_stage() {
   [[ $# -ge 1 ]] || die "Usage: skillforge stage <name>"
   require_skills_dir
   local name="$1"
+  _validate_skill_name "$name"
   local current_dir; current_dir=$(find_skill_dir "$name")
   [[ "$(dir_to_state "$current_dir")" == "decommissioned" ]] && \
     die "Skill '${name}' is decommissioned. Create a new skill instead."
@@ -400,6 +432,7 @@ cmd_unstage() {
   [[ $# -ge 1 ]] || die "Usage: skillforge unstage <name> [--to review|deactivated]"
   require_skills_dir
   local name="$1" target="review"
+  _validate_skill_name "$name"
   shift
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -659,6 +692,23 @@ cmd_git() {
   esac
 }
 
+# Validate a commit message against conventional commits format.
+# Derived from git-sme/SKILL.md: feat:, fix:, chore: etc.
+# Non-blocking — warns and offers to proceed rather than hard-failing.
+_validate_commit_msg() {
+  local msg="$1"
+  if [[ "$msg" =~ ^(feat|fix|chore|docs|style|refactor|perf|test|build|ci|revert)(\([a-z0-9_/.-]+\))?!?:[[:space:]].+ ]]; then
+    return 0
+  fi
+  warn "Commit message does not follow conventional commits format."
+  printf '  Expected: type(scope): description\n'
+  printf '  Examples: feat: add git-sme skill  |  fix(cli): handle empty input\n'
+  printf '  Types:    feat fix chore docs style refactor perf test build ci revert\n\n'
+  printf 'Proceed with this message anyway? [y/N]: '
+  local proceed; read -r proceed
+  [[ "${proceed,,}" == "y" ]] || return 1
+}
+
 _cmd_git_commit() {
   # 1. Check there is something staged
   local staged_files
@@ -697,13 +747,16 @@ _cmd_git_commit() {
   IFS= read -r msg
   [[ -z "$msg" || "$msg" == "cancel" ]] && { info "Aborted."; return 0; }
 
-  # 6. Confirm
+  # 6. Validate against conventional commits (git-sme standard)
+  _validate_commit_msg "$msg" || { info "Aborted."; return 0; }
+
+  # 7. Confirm
   printf '\n%sMessage:%s %s\n' "$BOLD" "$RESET" "$msg"
   printf 'Commit? (yes / no): '
   local answer; read -r answer
   [[ "$answer" != "yes" ]] && { info "Aborted."; return 0; }
 
-  # 7. Commit with the reviewed message
+  # 8. Commit with the reviewed message
   git commit -m "$msg"
 }
 
@@ -963,41 +1016,33 @@ cmd_update() {
   local staging_dir="${SKILLFORGE_DIR}/staging"
   local staging_manifest="${SKILLFORGE_DIR}/.staging-manifest"
 
-  [[ -f "$version_file" ]] || die "'skillforge update' requires a git-based install. Re-run install.sh from a cloned repo."
+  # Parse --source <path>
+  local source_path=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --source) source_path="${2:-}"; shift 2 ;;
+      *) die "Unknown argument: $1. Usage: skillforge update --source <path>" ;;
+    esac
+  done
+  [[ -n "$source_path" ]] || die "Usage: skillforge update --source <path>
+  <path>  Directory containing a skills/ subdirectory to apply updates from."
 
-  # Locate the source repo via the install version file's parent (stored at install time)
-  # Fall back to searching for a repo containing this binary
-  local repo_root=""
-  local this_script
-  this_script=$(command -v skillforge 2>/dev/null || true)
-  if [[ -n "$this_script" ]]; then
-    local script_dir; script_dir=$(cd "$(dirname "$this_script")" && pwd)
-    # The installed binary is a copy of scripts/skillforge.sh; repo is one level up from scripts/
-    # Try common install patterns
-    for candidate in "$script_dir/.." "$script_dir/../../.."; do
-      candidate=$(cd "$candidate" 2>/dev/null && pwd || true)
-      [[ -z "$candidate" ]] && continue
-      if git -C "$candidate" rev-parse HEAD >/dev/null 2>&1; then
-        repo_root="$candidate"; break
-      fi
-    done
-  fi
-  [[ -n "$repo_root" ]] || die "Cannot locate source git repo. Clone the repo and re-run install.sh."
+  source_path="${source_path/#\~/$HOME}"
+  [[ -d "$source_path" ]]        || die "Source path not found: ${source_path}"
+  [[ -d "${source_path}/skills" ]] || die "No skills/ subdirectory found in: ${source_path}"
 
   printf '%s=== Skill Forge Update ===%s\n\n' "$BOLD" "$RESET"
-  printf '  Source repo:  %s\n' "$repo_root"
-  printf '  Install dir:  %s\n\n' "$SKILLFORGE_DIR"
-
-  info "Pulling latest from remote..."
-  git -C "$repo_root" pull || die "git pull failed. Resolve any conflicts in the repo and retry."
+  printf '  Source:      %s\n' "$source_path"
+  printf '  Install dir: %s\n\n' "$SKILLFORGE_DIR"
 
   local updated=0 staged=0
 
-  while IFS= read -r -d '' repo_file; do
-    local rel="${repo_file#${repo_root}/skills/}"
+  while IFS= read -r -d '' src_file; do
+    local rel="${src_file#${source_path}/skills/}"
     local installed_file="${SKILLS_DIR}/${rel}"
     [[ -f "$installed_file" ]] || {
-      cp "$repo_file" "$installed_file"
+      mkdir -p "$(dirname "$installed_file")"
+      cp "$src_file" "$installed_file"
       ok "New: ${rel}"
       ((updated++)) || true
       continue
@@ -1006,16 +1051,16 @@ cmd_update() {
     local install_hash="" current_hash new_hash
     install_hash=$(grep -F "  skills/${rel}" "$checksums_file" 2>/dev/null | awk '{print $1}' || true)
     current_hash=$(_sha256 "$installed_file")
-    new_hash=$(_sha256 "$repo_file")
+    new_hash=$(_sha256 "$src_file")
 
-    # Nothing to do if the repo file hasn't changed
+    # Nothing to do if source file matches what is already installed
     [[ "$new_hash" == "$current_hash" ]] && continue
 
     if [[ -z "$install_hash" || "$current_hash" == "$install_hash" ]]; then
       # Pristine — update in place
-      cp "$repo_file" "$installed_file"
+      cp "$src_file" "$installed_file"
       # Refresh checksum entry
-      local tmp; tmp=$(mktemp)
+      local tmp; tmp=$(_mktemp)
       grep -vF "  skills/${rel}" "$checksums_file" > "$tmp" 2>/dev/null || true
       printf '%s  skills/%s\n' "$new_hash" "$rel" >> "$tmp"
       mv "$tmp" "$checksums_file"
@@ -1025,18 +1070,18 @@ cmd_update() {
       # Customised — stage new version for review
       local stage_path="${staging_dir}/skills/${rel}"
       mkdir -p "$(dirname "$stage_path")"
-      cp "$repo_file" "$stage_path"
+      cp "$src_file" "$stage_path"
       printf '%s\n' "$rel" >> "$staging_manifest"
       warn "Staged (customised): ${rel}"
       ((staged++)) || true
     fi
-  done < <(find "${repo_root}/skills" -type f -print0 2>/dev/null | sort -z)
+  done < <(find "${source_path}/skills" -type f -print0 2>/dev/null | sort -z)
 
   # Regenerate SME context after update
   _regen_sme_context
 
-  # Update install version
-  git -C "$repo_root" rev-parse HEAD > "$version_file"
+  # Record update timestamp
+  printf '%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$version_file"
 
   printf '\n'
   ok "Update complete. Updated in place: ${updated}. Staged for review: ${staged}."
@@ -1076,8 +1121,9 @@ cmd_staging() {
     diff)
       [[ $# -ge 1 ]] || die "Usage: skillforge staging diff <skill-name>"
       local name="$1"
+      _validate_skill_name "$name"
       local rel
-      rel=$(grep -F "$name" "$staging_manifest" 2>/dev/null | head -1 || true)
+      rel=$(grep -F "/${name}/" "$staging_manifest" 2>/dev/null | head -1 || true)
       [[ -n "$rel" ]] || die "No staged update found for '${name}'."
       local installed="${SKILLS_DIR}/${rel}"
       local staged="${staging_dir}/skills/${rel}"
@@ -1089,15 +1135,16 @@ cmd_staging() {
     accept)
       [[ $# -ge 1 ]] || die "Usage: skillforge staging accept <skill-name>"
       local name="$1"
+      _validate_skill_name "$name"
       local rel
-      rel=$(grep -F "$name" "$staging_manifest" 2>/dev/null | head -1 || true)
+      rel=$(grep -F "/${name}/" "$staging_manifest" 2>/dev/null | head -1 || true)
       [[ -n "$rel" ]] || die "No staged update found for '${name}'."
       local installed="${SKILLS_DIR}/${rel}"
       local staged="${staging_dir}/skills/${rel}"
       [[ -f "$staged" ]] || die "Staged file not found: ${staged}"
       cp "$staged" "$installed"
       rm -f "$staged"
-      local tmp; tmp=$(mktemp)
+      local tmp; tmp=$(_mktemp)
       grep -vF "$rel" "$staging_manifest" > "$tmp" 2>/dev/null || true
       mv "$tmp" "$staging_manifest"
       ok "Accepted: ${rel} — installed file updated."
@@ -1106,12 +1153,13 @@ cmd_staging() {
     dismiss)
       [[ $# -ge 1 ]] || die "Usage: skillforge staging dismiss <skill-name>"
       local name="$1"
+      _validate_skill_name "$name"
       local rel
-      rel=$(grep -F "$name" "$staging_manifest" 2>/dev/null | head -1 || true)
+      rel=$(grep -F "/${name}/" "$staging_manifest" 2>/dev/null | head -1 || true)
       [[ -n "$rel" ]] || die "No staged update found for '${name}'."
       local staged="${staging_dir}/skills/${rel}"
       rm -f "$staged"
-      local tmp; tmp=$(mktemp)
+      local tmp; tmp=$(_mktemp)
       grep -vF "$rel" "$staging_manifest" > "$tmp" 2>/dev/null || true
       mv "$tmp" "$staging_manifest"
       ok "Dismissed: ${rel} — staged version discarded, current file kept."
@@ -1320,23 +1368,13 @@ cmd_uninstall() {
     info "No customised files detected."
   fi
 
-  # Step 4 (was 3): Optionally remove skill data
+  # Step 4: Optionally remove skill data
   printf '\n%sStep 4: Skill data%s — %s\n' "$BOLD" "$RESET" "$SKILLFORGE_DIR"
   printf 'Remove skill data? Deletes all skills, memory, and config. (yes / no): '
-  printf '%s(Note: removal is skipped automatically if the directory is detected as the source repository.)%s\n' "$YELLOW" "$RESET"
   local remove_data; read -r remove_data
   if [[ "$remove_data" == "yes" ]]; then
-    # Source repository guard — refuse to delete if SKILLFORGE_DIR contains a .git dir
-    # and a scripts/install.sh file, which indicates it is the Skill Forge source repo
-    # and not a separate install target. This prevents the loss of the source directory.
-    if [[ -d "${SKILLFORGE_DIR}/.git" && -f "${SKILLFORGE_DIR}/scripts/install.sh" ]]; then
-      printf '\n%s[SAFETY]%s Refusing to delete %s — it appears to be the Skill Forge source repository (.git and scripts/install.sh detected).\n' "$RED" "$RESET" "$SKILLFORGE_DIR"
-      printf 'Set SKILLFORGE_DIR to a separate install location (e.g. %s/.skillforge) and re-run install.sh.\n' "$HOME"
-      info "Skill data NOT removed."
-    else
-      rm -rf "$SKILLFORGE_DIR"
-      ok "Removed: ${SKILLFORGE_DIR}"
-    fi
+    rm -rf "$SKILLFORGE_DIR"
+    ok "Removed: ${SKILLFORGE_DIR}"
   else
     info "Kept: ${SKILLFORGE_DIR}"
   fi
@@ -1350,7 +1388,7 @@ cmd_uninstall() {
     local path_comment='# Added by Skill Forge install.sh'
     for rc_file in "${HOME}/.bashrc" "${HOME}/.zshrc"; do
       [[ -f "$rc_file" ]] || continue
-      local tmp; tmp=$(mktemp)
+      local tmp; tmp=$(_mktemp)
       grep -v -F "$path_comment" "$rc_file" | grep -v -F "$path_line" > "$tmp"
       mv "$tmp" "$rc_file"
       ok "Cleaned: ${rc_file}"
@@ -1437,6 +1475,35 @@ cmd_lint() {
 }
 
 # ---------------------------------------------------------------------------
+# Command: show — display SKILL.md content for a named skill
+# ---------------------------------------------------------------------------
+cmd_show() {
+  [[ $# -ge 1 ]] || die "Usage: skillforge show <name>"
+  require_skills_dir
+  local name="$1"
+  _validate_skill_name "$name"
+  local skill_dir; skill_dir=$(find_skill_dir "$name")
+  local skill_file="${skill_dir}/SKILL.md"
+  [[ -f "$skill_file" ]] || die "SKILL.md not found in: ${skill_dir}"
+
+  # Parse frontmatter fields for the header summary
+  local fm_name fm_desc fm_type fm_version
+  fm_name=$(awk '/^---/{f++} f==1 && /^name:/{gsub(/^name:[[:space:]]*/,""); print; exit}' "$skill_file")
+  fm_desc=$(awk '/^---/{f++} f==1 && /^description:/{gsub(/^description:[[:space:]]*/,""); print; exit}' "$skill_file")
+  fm_type=$(awk '/^---/{f++} f==1 && /^[[:space:]]*skill-type:/{gsub(/^[[:space:]]*skill-type:[[:space:]]*/,""); print; exit}' "$skill_file")
+  fm_version=$(awk '/^---/{f++} f==1 && /^[[:space:]]*version:/{gsub(/^[[:space:]]*version:[[:space:]]*"?/,""); gsub(/"$/,""); print; exit}' "$skill_file")
+
+  printf '%s── %s%s\n' "$BOLD" "${fm_name:-$name}" "$RESET"
+  [[ -n "$fm_type" ]]    && printf '   type:     %s\n' "$fm_type"
+  [[ -n "$fm_version" ]] && printf '   version:  %s\n' "$fm_version"
+  [[ -n "$fm_desc" ]]    && printf '   %s\n' "$fm_desc"
+  printf '\n'
+
+  # Print body (everything after the closing ---)
+  awk 'BEGIN{f=0} /^---/{f++; next} f>=2{print}' "$skill_file"
+}
+
+# ---------------------------------------------------------------------------
 # Command: version / config
 # ---------------------------------------------------------------------------
 # VERSION SYNC: keep this version string aligned with docs/index.md "Version X.Y.Z" line
@@ -1452,7 +1519,7 @@ cmd_config() {
     if [[ -f "$CONFIG_FILE" ]]; then
       if grep -qE "^${key}:" "$CONFIG_FILE"; then
         local tmpfile
-        tmpfile=$(mktemp)
+        tmpfile=$(_mktemp)
         awk -v k="$key" -v v="$value" 'index($0, k":") == 1 { print k": "v; next } { print }' \
           "$CONFIG_FILE" > "$tmpfile" && mv "$tmpfile" "$CONFIG_FILE"
         ok "Updated: ${key} = ${value}"
@@ -1487,6 +1554,7 @@ ${BOLD}SKILL MANAGEMENT${RESET}
   stage <name>           Move to staging; symlinks in skills-staging/ only (not visible in production)
   unstage <name>         Return from staging to review (use --to deactivated to override)
   rm <name>              Decommission (permanent, no data loss)
+  show <name>            Display SKILL.md content for a skill
   audit                  Detect and auto-fix all invariant violations
   lint [file]            Check markdown quality
   doctor                 Self-check paths, tools, permissions, and PATH
@@ -1514,6 +1582,7 @@ ${BOLD}GIT${RESET}
   git repo-rename        Rename a repository and update the local remote URL
   git <other> [args]     Any other git command passed through directly
 
+  update --source <path> Apply skill updates from a directory; stages customised files for review
   uninstall              Remove symlinks, binary, and optionally all skill data
 
 ${BOLD}SKILL LOCATIONS${RESET}
@@ -1575,7 +1644,7 @@ cmd_help() {
     git)
       printf '%sskillforge git <command> [args]%s\n' "$BOLD" "$RESET"
       printf 'Run git commands with skill-forge safety gates:\n\n'
-      printf '  commit      — diff → message prompt → confirm → commit\n'
+      printf '  commit      — diff → message prompt → conventional-commit check → confirm → commit\n'
       printf '  all         — stage modified files → commit (diff-driven) → push\n'
       printf '  push        — blocks unconfirmed force-push to main/master\n'
       printf '  pr          — create a GitHub PR via gh (requires: gh auth login)\n'
@@ -1589,7 +1658,15 @@ cmd_help() {
       printf '  skillforge git push origin feat/my-branch\n'
       printf '  skillforge git pr --title "feat: add new skill"\n'
       printf '  skillforge git repo-create\n'
-      printf '  skillforge git repo-rename\n' ;;
+      printf '  skillforge git repo-rename\n'
+      # Surface git-sme skill content if installed
+      local git_sme_dir
+      git_sme_dir=$(find "${SKILLS_DIR}/sme" -maxdepth 1 -mindepth 1 -type d -name "git-sme" 2>/dev/null | head -1 || true)
+      if [[ -n "$git_sme_dir" && -f "${git_sme_dir}/SKILL.md" ]]; then
+        printf '\n%s── git-sme%s\n' "$BOLD" "$RESET"
+        awk 'BEGIN{f=0} /^---/{f++; next} f>=2{print}' "${git_sme_dir}/SKILL.md"
+      fi
+      ;;
     uninstall)
       printf '%sskillforge uninstall%s\n' "$BOLD" "$RESET"
       printf 'Interactively removes Skill Forge from the system:\n'
@@ -1625,6 +1702,7 @@ main() {
     stage)           cmd_stage "$@" ;;
     unstage)         cmd_unstage "$@" ;;
     rm)              cmd_rm "$@" ;;
+    show)            cmd_show "$@" ;;
     audit)           cmd_audit "$@" ;;
     update)          cmd_update "$@" ;;
     staging)         cmd_staging "$@" ;;

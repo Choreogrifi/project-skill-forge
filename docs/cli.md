@@ -205,7 +205,8 @@ Diff-driven commit flow — always shows the staged diff before asking for a mes
 3. Prints `git diff --cached --stat` and the full diff.
 4. Prints the last 5 commits for style reference.
 5. Prompts: `Enter commit message (review the diff above):`
-6. Confirms the message before committing.
+6. **Validates** the message against [conventional commits](https://www.conventionalcommits.org/) format (`feat:`, `fix:`, `chore:`, etc.) as defined in `git-sme`. Non-blocking — warns and asks to proceed if the format is not followed.
+7. Confirms the message before committing.
 
 ```bash
 skillforge git add scripts/skillforge.sh
@@ -355,17 +356,32 @@ skillforge uninstall
 
 Skill data is never deleted unless you explicitly answer `yes` to the separate confirmation in step 3. This means an uninstall followed by a reinstall preserves all your skills.
 
-> **Source repository protection**: If `$SKILLFORGE_DIR` contains a `.git` directory and `scripts/install.sh`, Skill Forge assumes it is pointing at the source repository and will refuse to delete the directory. Set `SKILLFORGE_DIR` to a separate install path (e.g. `~/.skillforge`) and re-run `install.sh` to resolve.
+> **Note**: The install script rejects git repositories as `SKILLFORGE_DIR`. If you see an error at install time, choose a path outside any cloned repo (e.g. `~/.skillforge`).
+
+---
+
+## `skillforge show <name>`
+
+Display the `SKILL.md` content for any installed skill — frontmatter summary followed by the full body.
+
+```bash
+skillforge show git-sme
+skillforge show architect-sme
+```
+
+Useful for inspecting a skill's constraints before invoking it, or piping the content to your clipboard for context.
 
 ---
 
 ## `skillforge update`
 
-Pull the latest skill definitions from the source repository. Updates pristine (unmodified) skills in place; stages modified skills for manual review.
+Apply skill updates from a source directory. Updates pristine (unmodified) skills in place; stages modified skills for manual review.
 
 ```bash
-skillforge update
+skillforge update --source <path>
 ```
+
+`<path>` must be a directory that contains a `skills/` subdirectory — a new download or any directory structured like the Skill Forge repository. The CLI does not manage or clone any git repository.
 
 **Behaviour for each changed file:**
 - **Pristine** (not customised since install) → updated in place automatically
@@ -378,8 +394,6 @@ skillforge staging diff <name>       # diff staged vs installed
 skillforge staging accept <name>     # apply the staged version
 skillforge staging dismiss <name>    # discard staged version, keep customisation
 ```
-
-Requires a git-based install (install.sh run from a cloned repository).
 
 ---
 

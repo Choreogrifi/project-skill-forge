@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Skill Forge — Skills for your AI agents</title>
+  <meta name="description" content="A filesystem-based skill management system for LLMs. Skills are directories. State is encoded in directory location. No database, no background services.">
+  <style>
+    /* ── Amber palette ─────────────────────────────────────────────────── */
+    :root {
+      --amber-50:   #fffbeb;
+      --amber-100:  #fef3c7;
+      --amber-200:  #fde68a;
+      --amber-400:  #fbbf24;
+      --amber-500:  #f59e0b;
+      --amber-600:  #d97706;
+      --amber-700:  #b45309;
+      --amber-800:  #92400e;
+      --amber-900:  #78350f;
+      --stone-900:  #1c1917;
+      --stone-700:  #44403c;
+      --stone-500:  #78716c;
+      --stone-200:  #e7e5e4;
+      --stone-100:  #f5f5f4;
+      --white:      #ffffff;
+    }
+
+    /* ── Reset & base ───────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-size: 16px;
+      line-height: 1.6;
+      color: var(--stone-900);
+      background: var(--white);
+    }
+    a { color: var(--amber-700); text-decoration: none; }
+    a:hover { color: var(--amber-900); text-decoration: underline; }
+    code, pre {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    }
+
+    /* ── Layout ─────────────────────────────────────────────────────────── */
+    .container { max-width: 1100px; margin: 0 auto; padding: 0 1.5rem; }
+
+    /* ── Navbar ─────────────────────────────────────────────────────────── */
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      background: var(--white);
+      border-bottom: 2px solid var(--amber-500);
+      padding: 0.75rem 0;
+    }
+    nav .inner {
+      display: flex; align-items: center; justify-content: space-between;
+      max-width: 1100px; margin: 0 auto; padding: 0 1.5rem;
+    }
+    .wordmark {
+      font-size: 1.2rem; font-weight: 700; letter-spacing: -0.02em;
+      color: var(--stone-900);
+      display: flex; align-items: center; gap: 0.4rem;
+    }
+    .wordmark span.forge { color: var(--amber-600); }
+    .wordmark .icon {
+      width: 28px; height: 28px;
+      background: var(--amber-500);
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--white); font-size: 0.9rem; font-weight: 700;
+    }
+    nav ul {
+      list-style: none; display: flex; gap: 1.75rem; align-items: center;
+    }
+    nav ul li a {
+      font-size: 0.9rem; font-weight: 500; color: var(--stone-700);
+    }
+    nav ul li a:hover { color: var(--amber-700); text-decoration: none; }
+    .nav-cta {
+      background: var(--amber-500); color: var(--white) !important;
+      padding: 0.4rem 1rem; border-radius: 6px; font-weight: 600 !important;
+      transition: background 0.15s;
+    }
+    .nav-cta:hover { background: var(--amber-600) !important; }
+
+    /* ── Hero ───────────────────────────────────────────────────────────── */
+    .hero {
+      padding: 5rem 0 4rem;
+      background: linear-gradient(160deg, var(--amber-50) 0%, var(--white) 60%);
+      border-bottom: 1px solid var(--amber-200);
+      text-align: center;
+    }
+    .hero h1 {
+      font-size: clamp(2rem, 5vw, 3.4rem);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.15;
+      color: var(--stone-900);
+      max-width: 760px; margin: 0 auto 1rem;
+    }
+    .hero h1 em { font-style: normal; color: var(--amber-600); }
+    .hero p.sub {
+      font-size: 1.15rem; color: var(--stone-700);
+      max-width: 560px; margin: 0 auto 2.25rem;
+    }
+    .hero-actions { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+    .btn-primary {
+      display: inline-block;
+      background: var(--amber-500); color: var(--white);
+      padding: 0.75rem 1.75rem; border-radius: 8px;
+      font-weight: 700; font-size: 1rem;
+      transition: background 0.15s, transform 0.1s;
+    }
+    .btn-primary:hover {
+      background: var(--amber-600); color: var(--white);
+      text-decoration: none; transform: translateY(-1px);
+    }
+    .btn-secondary {
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      border: 2px solid var(--stone-200); color: var(--stone-700);
+      padding: 0.73rem 1.5rem; border-radius: 8px;
+      font-weight: 600; font-size: 1rem;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    .btn-secondary:hover {
+      border-color: var(--amber-400); color: var(--amber-700);
+      text-decoration: none;
+    }
+    .hero-code {
+      display: inline-block; margin-top: 2.5rem;
+      background: var(--stone-900); color: var(--amber-200);
+      border-radius: 10px; padding: 1rem 1.5rem;
+      font-size: 0.9rem; text-align: left;
+      max-width: 560px; width: 100%;
+    }
+    .hero-code .prompt { color: var(--amber-500); user-select: none; }
+    .hero-code .comment { color: var(--stone-500); }
+
+    /* ── Compatible with ────────────────────────────────────────────────── */
+    .compat {
+      padding: 3rem 0;
+      background: var(--stone-100);
+      text-align: center;
+      border-bottom: 1px solid var(--stone-200);
+    }
+    .compat p {
+      font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em;
+      color: var(--stone-500); font-weight: 600; margin-bottom: 1.5rem;
+    }
+    .compat-logos {
+      display: flex; flex-wrap: wrap; justify-content: center;
+      gap: 2rem; align-items: center;
+    }
+    .compat-logo {
+      display: flex; align-items: center; gap: 0.5rem;
+      font-size: 0.9rem; font-weight: 600; color: var(--stone-700);
+    }
+    .compat-logo .logo-icon {
+      width: 32px; height: 32px; border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.75rem; font-weight: 800; color: var(--white);
+    }
+
+    /* ── Sections ───────────────────────────────────────────────────────── */
+    section { padding: 4.5rem 0; }
+    section.alt { background: var(--amber-50); border-top: 1px solid var(--amber-100); border-bottom: 1px solid var(--amber-100); }
+    .section-label {
+      font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.12em; color: var(--amber-600); margin-bottom: 0.5rem;
+    }
+    .section-title {
+      font-size: clamp(1.6rem, 3vw, 2.2rem);
+      font-weight: 800; letter-spacing: -0.02em;
+      color: var(--stone-900); margin-bottom: 0.75rem;
+    }
+    .section-sub {
+      font-size: 1.05rem; color: var(--stone-700);
+      max-width: 580px; margin-bottom: 3rem;
+    }
+
+    /* ── Card grid ──────────────────────────────────────────────────────── */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem;
+    }
+    .card {
+      background: var(--white);
+      border: 1px solid var(--stone-200);
+      border-radius: 12px; padding: 1.5rem;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .card:hover {
+      border-color: var(--amber-400);
+      box-shadow: 0 4px 16px rgba(245,158,11,0.12);
+    }
+    .card .icon {
+      width: 40px; height: 40px; border-radius: 8px;
+      background: var(--amber-100); color: var(--amber-700);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem; margin-bottom: 1rem;
+    }
+    .card h3 { font-size: 1rem; font-weight: 700; margin-bottom: 0.4rem; }
+    .card p  { font-size: 0.9rem; color: var(--stone-700); line-height: 1.5; }
+
+    /* ── Why section 3-col ──────────────────────────────────────────────── */
+    .why-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 2rem; margin-top: 2.5rem;
+    }
+    .why-card {
+      border-left: 3px solid var(--amber-500);
+      padding-left: 1.25rem;
+    }
+    .why-card h3 { font-size: 1rem; font-weight: 700; margin-bottom: 0.4rem; }
+    .why-card p  { font-size: 0.9rem; color: var(--stone-700); line-height: 1.5; }
+
+    /* ── Features 4-col ─────────────────────────────────────────────────── */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      gap: 1.75rem; margin-top: 2.5rem;
+    }
+    .feature {
+      padding: 1.5rem;
+      background: var(--white);
+      border-radius: 10px;
+      border: 1px solid var(--amber-200);
+    }
+    .feature .tag {
+      display: inline-block;
+      background: var(--amber-100); color: var(--amber-800);
+      font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.08em; border-radius: 4px; padding: 0.2rem 0.5rem;
+      margin-bottom: 0.75rem;
+    }
+    .feature h3 { font-size: 0.95rem; font-weight: 700; margin-bottom: 0.4rem; }
+    .feature p  { font-size: 0.85rem; color: var(--stone-700); line-height: 1.5; }
+
+    /* ── Get Started cards ──────────────────────────────────────────────── */
+    .getstarted-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 1.25rem; margin-top: 2.5rem;
+    }
+    .gs-card {
+      display: flex; flex-direction: column;
+      background: var(--white);
+      border: 1.5px solid var(--stone-200);
+      border-radius: 10px; padding: 1.25rem;
+      transition: border-color 0.15s, transform 0.1s;
+      text-decoration: none; color: inherit;
+    }
+    .gs-card:hover {
+      border-color: var(--amber-500); transform: translateY(-2px);
+      text-decoration: none; color: inherit;
+    }
+    .gs-card .gs-icon {
+      font-size: 1.4rem; margin-bottom: 0.75rem;
+    }
+    .gs-card h3 { font-size: 0.9rem; font-weight: 700; margin-bottom: 0.3rem; }
+    .gs-card p  { font-size: 0.8rem; color: var(--stone-500); }
+
+    /* ── Open format CTA ────────────────────────────────────────────────── */
+    .open-cta {
+      background: var(--amber-900);
+      padding: 4rem 0; text-align: center; color: var(--amber-100);
+    }
+    .open-cta h2 {
+      font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 800;
+      letter-spacing: -0.02em; margin-bottom: 0.75rem; color: var(--white);
+    }
+    .open-cta p {
+      font-size: 1rem; max-width: 520px; margin: 0 auto 2rem;
+      color: var(--amber-200);
+    }
+    .open-cta .btn-amber {
+      display: inline-block;
+      background: var(--amber-500); color: var(--white);
+      padding: 0.75rem 1.75rem; border-radius: 8px;
+      font-weight: 700; font-size: 1rem;
+      transition: background 0.15s;
+    }
+    .open-cta .btn-amber:hover {
+      background: var(--amber-400); text-decoration: none; color: var(--white);
+    }
+
+    /* ── Footer ─────────────────────────────────────────────────────────── */
+    footer {
+      background: var(--stone-900); color: var(--stone-500);
+      padding: 2.5rem 0;
+    }
+    footer .inner {
+      display: flex; justify-content: space-between; align-items: center;
+      flex-wrap: wrap; gap: 1rem;
+    }
+    footer .footer-brand {
+      font-weight: 700; color: var(--amber-400); font-size: 0.95rem;
+    }
+    footer ul {
+      list-style: none; display: flex; gap: 1.5rem; flex-wrap: wrap;
+    }
+    footer ul li a { font-size: 0.85rem; color: var(--stone-500); }
+    footer ul li a:hover { color: var(--amber-400); text-decoration: none; }
+    footer .license { font-size: 0.8rem; color: var(--stone-500); }
+
+    /* ── Responsive ─────────────────────────────────────────────────────── */
+    @media (max-width: 640px) {
+      nav ul { gap: 1rem; }
+      .hero { padding: 3rem 0 2.5rem; }
+      .hero-code { font-size: 0.8rem; }
+      footer .inner { flex-direction: column; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Navbar ────────────────────────────────────────────────────────────── -->
+<nav>
+  <div class="inner">
+    <a href="/" class="wordmark" style="text-decoration:none">
+      <span class="icon">SF</span>
+      Skill&nbsp;<span class="forge">Forge</span>
+    </a>
+    <ul>
+      <li><a href="getting-started.html">Docs</a></li>
+      <li><a href="cli.html">CLI</a></li>
+      <li><a href="skill-spec.html">Spec</a></li>
+      <li><a href="https://github.com/Choreogrifi/skill-forge" class="nav-cta">GitHub</a></li>
+    </ul>
+  </div>
+</nav>
+
+<!-- ── Hero ──────────────────────────────────────────────────────────────── -->
+<div class="hero">
+  <div class="container">
+    <h1>The <em>skill layer</em> for your AI agents</h1>
+    <p class="sub">
+      A simple, open format for giving LLM agents new capabilities and expertise.
+      Skills are directories — no database, no background services.
+    </p>
+    <div class="hero-actions">
+      <a href="getting-started.html" class="btn-primary">Get Started</a>
+      <a href="https://github.com/Choreogrifi/skill-forge" class="btn-secondary">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+        Star on GitHub
+      </a>
+    </div>
+    <div class="hero-code">
+      <div><span class="prompt">$ </span>bash scripts/install.sh</div>
+      <div style="margin-top:0.5rem"><span class="prompt">$ </span>skillforge ls</div>
+      <div style="margin-top:0.5rem"><span class="prompt">$ </span>skillforge activate architect-sme</div>
+      <div style="margin-top:0.5rem; color:#fbbf24"><span class="prompt">$ </span>skillforge show git-sme</div>
+      <div style="margin-top:0.5rem"><span class="comment"># Skills are now visible to Claude, Gemini, and more</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Compatible with ──────────────────────────────────────────────────── -->
+<div class="compat">
+  <div class="container">
+    <p>Compatible with</p>
+    <div class="compat-logos">
+      <div class="compat-logo">
+        <div class="logo-icon" style="background:#d97706">CC</div>
+        Claude Code
+      </div>
+      <div class="compat-logo">
+        <div class="logo-icon" style="background:#4285f4">G</div>
+        Gemini CLI
+      </div>
+      <div class="compat-logo">
+        <div class="logo-icon" style="background:#007acc">VS</div>
+        VS Code
+      </div>
+      <div class="compat-logo">
+        <div class="logo-icon" style="background:#24292e">GH</div>
+        GitHub Copilot
+      </div>
+      <div class="compat-logo">
+        <div class="logo-icon" style="background:#7c3aed">Cu</div>
+        Cursor
+      </div>
+      <div class="compat-logo">
+        <div class="logo-icon" style="background:#16a34a">+</div>
+        Any LLM Agent
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Why Skill Forge ───────────────────────────────────────────────────── -->
+<section>
+  <div class="container">
+    <div class="section-label">Why Skill Forge</div>
+    <h2 class="section-title">Skills provide procedural knowledge on demand</h2>
+    <p class="section-sub">
+      Agents often lack the context needed to work reliably in your specific environment.
+      Skills close that gap — and do it portably.
+    </p>
+    <div class="why-grid">
+      <div class="why-card">
+        <h3>For skill authors</h3>
+        <p>Build once, deploy across multiple agent products. Version-control your expertise alongside your code.</p>
+      </div>
+      <div class="why-card">
+        <h3>For compatible agents</h3>
+        <p>Extend LLM capabilities without retraining. Skills are loaded on-demand, keeping context windows lean.</p>
+      </div>
+      <div class="why-card">
+        <h3>For teams &amp; enterprises</h3>
+        <p>Capture organizational knowledge in portable, version-controlled packages. Onboard agents to your stack in minutes.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── What skills enable ────────────────────────────────────────────────── -->
+<section class="alt">
+  <div class="container">
+    <div class="section-label">What skills enable</div>
+    <h2 class="section-title">From domain expertise to repeatable workflows</h2>
+    <div class="features-grid">
+      <div class="feature">
+        <span class="tag">Domain</span>
+        <h3>Deep expertise</h3>
+        <p>Package specialized knowledge — architecture patterns, Git protocols, GCP conventions — and invoke it only when needed.</p>
+      </div>
+      <div class="feature">
+        <span class="tag">Capabilities</span>
+        <h3>New capabilities</h3>
+        <p>Teach agents to create diagrams, build Terraform modules, generate documents, or analyze datasets.</p>
+      </div>
+      <div class="feature">
+        <span class="tag">Workflows</span>
+        <h3>Repeatable workflows</h3>
+        <p>Multi-step tasks as consistent, auditable workflows. Commit flows, PR reviews, deploy sequences — done right, every time.</p>
+      </div>
+      <div class="feature">
+        <span class="tag">Portability</span>
+        <h3>Interoperability</h3>
+        <p>Skills work across Claude, Gemini, and any agent that supports the open SKILL.md format. No lock-in.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── How it works ──────────────────────────────────────────────────────── -->
+<section>
+  <div class="container">
+    <div class="section-label">How it works</div>
+    <h2 class="section-title">Filesystem-first. No database required.</h2>
+    <p class="section-sub">
+      Skill state is encoded in directory location, not in a config file.
+      Symlinks control what's visible to the LLM.
+    </p>
+    <div class="card-grid">
+      <div class="card">
+        <div class="icon">📁</div>
+        <h3>Skills are directories</h3>
+        <p>Each skill is a folder containing a <code>SKILL.md</code> file. No build step, no registry, no compile target.</p>
+      </div>
+      <div class="card">
+        <div class="icon">🔗</div>
+        <h3>Symlinks = visibility</h3>
+        <p>Active skills are symlinked into <code>~/.claude/skills/</code> or <code>~/.gemini/skills/</code>. Remove the symlink to hide the skill — the data is never deleted.</p>
+      </div>
+      <div class="card">
+        <div class="icon">⚡</div>
+        <h3>Lifecycle in the path</h3>
+        <p>State is encoded in directory location: <code>sme/</code>, <code>deactivated/</code>, <code>review/</code>, <code>staging/</code>, <code>decommissioned/</code>.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Get Started ───────────────────────────────────────────────────────── -->
+<section class="alt">
+  <div class="container">
+    <div class="section-label">Get Started</div>
+    <h2 class="section-title">Everything you need</h2>
+    <div class="getstarted-grid">
+      <a href="getting-started.html" class="gs-card">
+        <div class="gs-icon">💡</div>
+        <h3>What are skills?</h3>
+        <p>Concepts, skill types, and the SKILL.md format</p>
+      </a>
+      <a href="getting-started.html#install" class="gs-card">
+        <div class="gs-icon">📦</div>
+        <h3>Install</h3>
+        <p>Prerequisites, install script, and first run</p>
+      </a>
+      <a href="cli.html" class="gs-card">
+        <div class="gs-icon">⌨️</div>
+        <h3>CLI Reference</h3>
+        <p>All commands with examples and flags</p>
+      </a>
+      <a href="skill-spec.html" class="gs-card">
+        <div class="gs-icon">📄</div>
+        <h3>SKILL.md Spec</h3>
+        <p>Frontmatter schema, naming rules, and validation</p>
+      </a>
+      <a href="skill-catalog.html" class="gs-card">
+        <div class="gs-icon">🗂️</div>
+        <h3>Skill Catalog</h3>
+        <p>All built-in SME and workflow skills</p>
+      </a>
+      <a href="how-it-works.html" class="gs-card">
+        <div class="gs-icon">🔍</div>
+        <h3>How it works</h3>
+        <p>Filesystem model, memory system, and self-discovery</p>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ── Open format CTA ───────────────────────────────────────────────────── -->
+<div class="open-cta">
+  <div class="container">
+    <h2>Open format. Open source.</h2>
+    <p>
+      Skill Forge is released under the Apache 2.0 licence.
+      The SKILL.md format is an open standard — any agent can adopt it.
+      Contributions welcome.
+    </p>
+    <a href="https://github.com/Choreogrifi/skill-forge" class="btn-amber">
+      View on GitHub ↗
+    </a>
+  </div>
+</div>
+
+<!-- ── Footer ────────────────────────────────────────────────────────────── -->
+<footer>
+  <div class="container inner">
+    <span class="footer-brand">Skill Forge</span>
+    <ul>
+      <li><a href="getting-started.html">Docs</a></li>
+      <li><a href="cli.html">CLI</a></li>
+      <li><a href="skill-spec.html">SKILL.md Spec</a></li>
+      <li><a href="skill-catalog.html">Catalog</a></li>
+      <li><a href="https://github.com/Choreogrifi/skill-forge">GitHub</a></li>
+    </ul>
+    <span class="license">Apache 2.0 · Built by Choreogrifi</span>
+  </div>
+</footer>
+
+</body>
+</html>

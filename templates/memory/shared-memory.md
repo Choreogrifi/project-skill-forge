@@ -13,7 +13,6 @@ last-updated: <YYYY-MM-DD>
 
      Existing shared memory files:
        - workspace-conventions.md — naming rules, tooling standards, project patterns, preferences
-       - symlink-registry.md      — tracked symlinks for this Skill Forge install
 
      Create additional shared memory files only if the context is truly cross-skill.
 -->

@@ -16,7 +16,6 @@ last-updated: 2026-03-30
 
 | User Intent | Target File |
 |---|---|
-| New symlink discovered | `${SKILLFORGE_DIR}/memory/shared/symlink-registry.md` |
 | SME domain knowledge or standard | `${SKILLFORGE_DIR}/memory/sme/<skill-name>.md` |
 | Workflow-specific context or convention | `${SKILLFORGE_DIR}/memory/workflow/<skill-name>.md` |
 

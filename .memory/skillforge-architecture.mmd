@@ -1,0 +1,89 @@
+---
+title: SkillForge — Solution Architecture & Migration Context
+date: 2026-03-30
+branch-stabilised: main @ 4dedfc2
+---
+
+%%{ init: { 'theme': 'base', 'themeVariables': { 'fontSize': '14px' } } }%%
+
+graph TD
+
+  subgraph INCIDENT["Incident & Recovery (2026-03-27 → 2026-03-29)"]
+    direction TB
+    I1["🔴 skillforge uninstall\ndeleted source repo\n150+ files lost"] --> I2["ccc6d4b\nRevert — files restored\n(session plan lost)"]
+    I2 --> I3["4dbdc85\nPost-delete cleanup"]
+    I3 --> I4["8ad1ae9\nmigration-v3 renames\n+ skill consolidation\n+ generic-only enforcement"]
+  end
+
+  subgraph MIGRATIONS["Migration Requirements (v1 → v4)"]
+    direction TB
+    M1["v1 — Restructure /skills\ninto /sme + /workflow\nSubflows, templates, CLI"]
+    M2["v2 — Naming & frontmatter fixes\nGeneric top-level SMEs\nMarkdown linter"]
+    M3["v3 — Strict naming conventions\n{sme-name}-wf / {flow-name}-{action}-sf\nRemove manage|add|create|drawer"]
+    M4["v4 — Cross-skill validation\nSelf-discovery loop\nREADME & docs alignment"]
+    M1 --> M2 --> M3 --> M4
+  end
+
+  subgraph BRANCHES["Branch Lifecycle"]
+    direction LR
+    B1["main @ 0df4c6d\nPR #7 merged"] --> B2["feat/merge-llm\n+3 commits\n(incident recovery + migration-v3)"]
+    B2 -->|"PR #8 — fast-forward\n2026-03-30"| B3["main @ 4dedfc2\nStabilised ✅"]
+    B3 -->|"branch deleted"| B4["feat/merge-llm\n🗑 removed"]
+  end
+
+  subgraph ARCH["Current Architecture — main @ 4dedfc2"]
+    direction TB
+
+    subgraph SKILLS["skills/"]
+      S_SME["sme/\n  architect-sme\n  content-creator-sme\n  devops-sme\n  diagram-sme\n  document-sme\n  engineer-sme\n  gcp-sme\n  git-sme\n  security-sme\n  skills-sme\n  terraform-sme\n  tester-sme"]
+      S_WF["workflow/\n  content-wf\n  document-wf\n  gcp-wf\n  git-commit-wf\n  git-wf\n  github-wf\n  gitlab-wf\n  memory-wf\n  mermaid-wf\n  skills-wf\n  terraform-wf"]
+      S_LIFECYCLE["Lifecycle dirs/\n  review/\n  deactivated/\n  decommissioned/"]
+    end
+
+    subgraph MEMORY["memory/"]
+      M_SME["sme/ — per-SME context\n  architect, content-creator,\n  devops, document, engineer,\n  gcp, git, security, terraform, tester"]
+      M_WF["workflow/ — per-workflow context\n  content, document, gcp, git,\n  github, gitlab, memory,\n  mermaid, skills, terraform"]
+      M_SH["shared/\n  symlink-registry.md"]
+    end
+
+    subgraph SCRIPTS["scripts/"]
+      SC1["skillforge.sh — main CLI"]
+      SC2["install.sh — install & LLM setup"]
+      SC3["check-skill-names.sh — naming validator"]
+      SC4["test-env-setup/teardown.sh"]
+      SC5["hooks/pre-commit"]
+    end
+
+    subgraph TEMPLATES["templates/"]
+      T1["memory/ — shared, sme, workflow"]
+      T2["persona/ — model, always-on, manual"]
+      T3["reference/ — reference-name-ref"]
+      T4["workflow/ — subflow-skill"]
+    end
+
+    subgraph TESTS["tests/"]
+      TE1["evals/ — architect, git, security SME evals"]
+      TE2["fixtures/ — test-skill-sme"]
+      TE3["run_evals.sh + test_skillforge.bats"]
+    end
+
+    subgraph DOCS["docs/ (GitHub Pages)"]
+      D1["cli.md\ngetting-started.md\nhow-it-works.md\nskill-catalog.md\nskill-spec.md"]
+    end
+
+    subgraph CI["CI (.github/workflows/)"]
+      CI1["validate.yml\n— skill name check\n— pre-commit hook\n— bats tests\n— eval runner"]
+    end
+  end
+
+  INCIDENT --> MIGRATIONS
+  MIGRATIONS --> BRANCHES
+  BRANCHES --> ARCH
+
+  S_SME -.->|"activates"| S_WF
+  S_WF -.->|"loads"| M_WF
+  S_SME -.->|"loads"| M_SME
+  SC1 -.->|"invokes"| S_SME
+  SC1 -.->|"invokes"| S_WF
+  CI1 -.->|"runs"| SC3
+  CI1 -.->|"runs"| TE3

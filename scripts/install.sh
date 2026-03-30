@@ -50,6 +50,16 @@ fi
 # Expand ~ if present
 SKILLFORGE_DIR="${SKILLFORGE_DIR/#\~/$HOME}"
 
+# Reject git repositories as install targets — the install must be independent
+# of any cloned repo. Re-prompt until the user provides a non-repo directory.
+while [[ -d "${SKILLFORGE_DIR}/.git" ]]; do
+  warn "'${SKILLFORGE_DIR}' is a git repository. Skill Forge must be installed outside any cloned repo."
+  printf 'Choose a different directory [%s/.skillforge]: ' "$HOME"
+  read -r user_dir
+  SKILLFORGE_DIR="${user_dir:-${HOME}/.skillforge}"
+  SKILLFORGE_DIR="${SKILLFORGE_DIR/#\~/$HOME}"
+done
+
 SKILLS_DIR="${SKILLFORGE_DIR}/skills"
 CONFIG_FILE="${HOME}/.skillforge/config.yaml"
 LOCAL_BIN="${HOME}/.local/bin"
@@ -339,12 +349,8 @@ fi
 # ---------------------------------------------------------------------------
 header "Step 8: Installing Skill Forge CLI"
 
-# Support both names during transition (Step 3 renames agents.sh → skillforge.sh)
-CLI_SRC=""
-for candidate in "${REPO_ROOT}/scripts/skillforge.sh" "${REPO_ROOT}/scripts/agents.sh"; do
-  [[ -f "$candidate" ]] && { CLI_SRC="$candidate"; break; }
-done
-[[ -n "$CLI_SRC" ]] || die "CLI script not found in ${REPO_ROOT}/scripts/"
+CLI_SRC="${REPO_ROOT}/scripts/skillforge.sh"
+[[ -f "$CLI_SRC" ]] || die "CLI script not found: ${CLI_SRC}"
 
 CLI_BINARY="${LOCAL_BIN}/skillforge"
 cp "$CLI_SRC" "$CLI_BINARY"
@@ -427,13 +433,9 @@ _sha256() {
 } > "$CHECKSUMS_FILE"
 ok "Checksums written: ${CHECKSUMS_FILE}"
 
-# Record the git commit SHA of the source repo (if available)
-if git -C "$REPO_ROOT" rev-parse HEAD >/dev/null 2>&1; then
-  git -C "$REPO_ROOT" rev-parse HEAD > "$INSTALL_VERSION_FILE"
-  ok "Install version recorded: $(cat "$INSTALL_VERSION_FILE")"
-else
-  warn "Not a git repo — install version not recorded. 'skillforge update' will require a git clone."
-fi
+# Record install timestamp — no git dependency
+printf '%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$INSTALL_VERSION_FILE"
+ok "Install timestamp recorded: $(cat "$INSTALL_VERSION_FILE")"
 
 # ---------------------------------------------------------------------------
 # Summary
